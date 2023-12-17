@@ -1,7 +1,9 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const morgan = require("morgan");
 const cors = require("cors");
+const Phone = require("./models/Phone");
 const PORT = process.env.PORT || 3001;
 
 let persons = [
@@ -48,7 +50,9 @@ app.get("/info", (req, res) => {
 });
 
 app.get("/api/persons", (req, res) => {
-  res.json(persons);
+  Phone.find({}).then((results) => {
+    res.json(results);
+  });
 });
 
 const generateId = () => {
@@ -63,23 +67,14 @@ app.post("/api/persons", (req, res) => {
     return res.status(400).json({ error: "name or number is missing" });
   }
 
-  const match = persons.find((person) => person.name === body.name);
-
-  if (match) {
-    return res
-      .status(400)
-      .json({ error: "account with this name already exists" });
-  }
-
-  const person = {
+  const phone = new Phone({
     name: body.name,
     number: body.number,
-    id: generateId(),
-  };
+  });
 
-  persons = persons.concat(person);
-
-  res.json(person);
+  phone.save().then((result) => {
+    res.json(result);
+  });
 });
 
 app.get("/api/persons/:id", (req, res) => {
