@@ -6,32 +6,18 @@ const cors = require("cors");
 const Phone = require("./models/Phone");
 const PORT = process.env.PORT || 3001;
 
-let persons = [
-  {
-    id: 1,
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: 2,
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: 3,
-    name: "Dan Abramov",
-    number: "12-43-234345",
-  },
-  {
-    id: 4,
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-  },
-];
-
 app.use(express.static("dist"));
 app.use(cors());
 app.use(express.json());
+
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message);
+  if (error.name === "CastError") {
+    return res.status(400).send({ error: "malformatted id" });
+  }
+
+  next(error);
+};
 
 morgan.token("body", (req, res) => {
   return JSON.stringify(req.body);
@@ -42,11 +28,13 @@ app.use(
 );
 
 app.get("/info", (req, res) => {
-  res.send(
-    `<p>Phonebook has info for ${
-      persons.length
-    } people</p><p>${new Date().toString()}</p<`
-  );
+  Phone.find({}).then((result) => {
+    res.send(
+      `<p>Phonebook has info for ${
+        result.length
+      } people</p><p>${new Date().toString()}</p<`
+    );
+  });
 });
 
 app.get("/api/persons", (req, res) => {
@@ -54,11 +42,6 @@ app.get("/api/persons", (req, res) => {
     res.json(results);
   });
 });
-
-const generateId = () => {
-  const number = persons.length > 0 ? Math.max(...persons.map((p) => p.id)) : 0;
-  return number + 1;
-};
 
 app.post("/api/persons", (req, res) => {
   const body = req.body;
@@ -77,23 +60,35 @@ app.post("/api/persons", (req, res) => {
   });
 });
 
-app.get("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((p) => p.id === id);
+app.put("/api/persons/:id", (req, res, next) => {
+  const { name, number } = req.body;
 
-  if (person) {
-    res.json(person);
-  } else {
-    res.status(404).end();
-  }
+  const newPhone = { name, number };
+
+  Phone.findByIdAndUpdate(req.params.id, newPhone, { new: true })
+    .then((updatedPhone) => res.json(updatedPhone))
+    .catch((error) => next(error));
 });
 
-app.delete("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const filteredPersons = persons.filter((p) => p.id !== id);
-  persons = filteredPersons;
-  res.status(204).end();
+app.get("/api/persons/:id", (req, res, next) => {
+  Phone.findById(req.params.id)
+    .then((result) => {
+      if (result) {
+        res.json(result);
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
+
+app.delete("/api/persons/:id", (req, res, next) => {
+  Phone.findByIdAndDelete(req.params.id)
+    .then((result) => res.status(204).end())
+    .catch((error) => next(error));
+});
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port: ${PORT}`);
